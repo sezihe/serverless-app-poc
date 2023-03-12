@@ -4,6 +4,7 @@ import { DocumentClient } from 'aws-sdk/clients/dynamodb'
 import { createLogger } from '../utils/logger'
 import { TodoItem } from '../models/TodoItem'
 import { TodoUpdate } from '../models/TodoUpdate';
+import { parseUserId } from '../auth/utils'
 
 const XAWS: any = AWSXRay.captureAWS(AWS)
 
@@ -18,8 +19,9 @@ export class TodosAccess {
       private todosByUserIndex = process.env.TODOS_BY_USER_INDEX
     ) {}
   
-    async todoItemExists(todoId: string): Promise<boolean> {
-      return !!(await this.getTodoItem(todoId));
+    async todoItemExists(todoId: string, jwtToken: string): Promise<boolean> {
+      const userId = parseUserId(jwtToken);
+      return !!(await this.getTodoItem(todoId, userId));
     }
   
     async getTodoItems(userId: string): Promise<TodoItem[]> {
@@ -41,12 +43,13 @@ export class TodosAccess {
       return items as TodoItem[]
     }
   
-    async getTodoItem(todoId: string): Promise<TodoItem> {
+    async getTodoItem(todoId: string, userId): Promise<TodoItem> {
       logger.info(`Getting todo ${todoId} from ${this.todosTable}`)
   
       const result = await this.docClient.get({
         TableName: this.todosTable,
         Key: {
+          userId,
           todoId
         }
       }).promise()
@@ -65,12 +68,13 @@ export class TodosAccess {
       }).promise()
     }
   
-    async updateTodoItem(todoId: string, todoUpdate: TodoUpdate) {
+    async updateTodoItem(todoId: string, todoUpdate: TodoUpdate, userId: string) {
       logger.info(`Updating todo item ${todoId} in ${this.todosTable}`)
   
       await this.docClient.update({
         TableName: this.todosTable,
         Key: {
+          userId,
           todoId
         },
         UpdateExpression: 'set #name = :name, dueDate = :dueDate, done = :done',
@@ -85,23 +89,26 @@ export class TodosAccess {
       }).promise()   
     }
   
-    async deleteTodoItem(todoId: string) {
-      logger.info(`Deleting todo item ${todoId} from ${this.todosTable}`)
+    async deleteTodoItem(todoId: string, userId: string) {
+      logger.info(`Deleting todo item ${todoId} from ${this.todosTable}. UserId: ${userId}
+      `)
   
       await this.docClient.delete({
         TableName: this.todosTable,
         Key: {
+          userId,
           todoId
         }
       }).promise()    
     }
   
-    async updateAttachmentUrl(todoId: string, attachmentUrl: string) {
+    async updateAttachmentUrl(todoId: string, attachmentUrl: string, userId: string) {
       logger.info(`Updating attachment URL for todo ${todoId} in ${this.todosTable}`)
   
       await this.docClient.update({
         TableName: this.todosTable,
         Key: {
+          userId,
           todoId
         },
         UpdateExpression: 'set attachmentUrl = :attachmentUrl',

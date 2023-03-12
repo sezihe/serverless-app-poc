@@ -7,6 +7,8 @@ plugins:
   - serverless-webpack
   - serverless-iam-roles-per-function
   - serverless-plugin-tracing
+  - serverless-reqvalidator-plugin
+  - serverless-aws-documentation
 
 provider:
   name: aws
@@ -23,7 +25,7 @@ provider:
   # Use these variables in the functions and resouorces section below. For example, 
   # ${self:provider.environment.ATTACHMENT_S3_BUCKET}
   environment:
-    TODOS_TABLE: Todos-${self:provider.stage}
+    TODOS_TABLE: Todos-${self:provider.stage}-main
     TODOS_CREATED_AT_INDEX: CreatedAtIndex
     ATTACHMENT_S3_BUCKET: serverless-c4-todo-images-${self:provider.stage}-589117388711
     SIGNED_URL_EXPIRATION: 300
@@ -42,6 +44,42 @@ provider:
             - xray:PutTelemetryRecords
             - xray:PutTraceSegments
           Resource: "*"
+
+custom:
+  documentation:
+    api:
+      info:
+        version: '1.0.0'
+        title: serverless-api
+        description: serverless-api
+    models:
+      - name: CreateTodoRequest
+        contentType: "application/json"
+        schema:
+          required:
+            - name
+            - dueDate
+          properties:
+            name:
+              minLength: 1
+              type: string
+            dueDate:
+              type: string
+      - name: UpdateTodoRequest
+        contentType: "application/json"
+        schema:
+          required:
+            - name
+            - dueDate
+            - done
+          properties:
+            name:
+              minLength: 1
+              type: string
+            dueDate:
+              type: string
+            done:
+              type: boolean
 
 
 functions:
@@ -92,9 +130,11 @@ functions:
           path: todos
           cors: true
           authorizer: Auth
-          request:
-            schemas:
-              application/json: ${file(models/create-todo-model.json)}
+          reqValidatorName: RequestBodyValidator
+          documentation:
+            summary: "Creates a new todo item"
+            requestModels:
+              "application/json": CreateTodoRequest
     iamRoleStatements:
       - Effect: Allow
         Action:
@@ -125,6 +165,12 @@ functions:
           path: todos/{todoId}
           cors: true
           authorizer: Auth
+          documentation:
+            summary: "Update a todo item"
+            description: "Update a todo item"
+            requestModels:
+              "application/json": UpdateTodoRequest
+          reqValidatorName: RequestBodyValidator
     iamRoleStatements:
       - Effect: Allow
         Action:
@@ -227,6 +273,15 @@ resources:
         ResponseType: DEFAULT_4XX
         RestApiId:
           Ref: ApiGatewayRestApi
+
+    RequestBodyValidator:
+      Type: AWS::ApiGateway::RequestValidator
+      Properties:
+        Name: 'request-body-validator'
+        RestApiId:
+          Ref: ApiGatewayRestApi
+        ValidateRequestBody: true
+        ValidateRequestParameters: false
     
     # TODO: Create a DynamoDB table with local secondary index and a composite key
     TodosTable:
@@ -240,8 +295,10 @@ resources:
           - AttributeName: createdAt
             AttributeType: S
         KeySchema:
-          - AttributeName: todoId
+          - AttributeName: userId
             KeyType: HASH
+          - AttributeName: todoId
+            KeyType: RANGE
         BillingMode: PAY_PER_REQUEST
         TableName: ${self:provider.environment.TODOS_TABLE}
         GlobalSecondaryIndexes:

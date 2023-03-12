@@ -31,7 +31,7 @@ export async function createTodo(userId: string, createTodoRequest: CreateTodoRe
 }
 
 export async function updateTodo(userId: string, todoId: string, updateTodoRequest: UpdateTodoRequest) {  
-    const item = await todosAccess.getTodoItem(todoId)
+    const item = await todosAccess.getTodoItem(todoId, userId)
 
     if (item.userId !== userId)
         throw new Error('User is not authorized to update item');
@@ -39,11 +39,11 @@ export async function updateTodo(userId: string, todoId: string, updateTodoReque
     if (!item)
         throw new Error('Item not found')
 
-    todosAccess.updateTodoItem(todoId, updateTodoRequest);
+    todosAccess.updateTodoItem(todoId, updateTodoRequest, userId);
 }
 
 export async function deleteTodo(userId: string, todoId: string) {  
-    const item = await todosAccess.getTodoItem(todoId)
+    const item = await todosAccess.getTodoItem(todoId, userId)
 
     if (item.userId !== userId)
         throw new Error('User is not authorized to delete item')
@@ -51,13 +51,13 @@ export async function deleteTodo(userId: string, todoId: string) {
     if (!item)
         throw new Error('Item not found')
 
-    todosAccess.deleteTodoItem(todoId)
+    todosAccess.deleteTodoItem(todoId, userId)
 }
 
 export async function updateTodoAttachmentUrl(userId: string, todoId: string, attachmentId: string) { 
     const attachmentUrl = await attachmentUtils.getAttachmentUrl(attachmentId)
 
-    const item = await todosAccess.getTodoItem(todoId)
+    const item = await todosAccess.getTodoItem(todoId, userId)
 
     if (item.userId !== userId)
         throw new Error('User is not authorized to update item')
@@ -65,7 +65,7 @@ export async function updateTodoAttachmentUrl(userId: string, todoId: string, at
     if (!item)
         throw new Error('Item not found')
 
-    await todosAccess.updateAttachmentUrl(todoId, attachmentUrl)
+    await todosAccess.updateAttachmentUrl(todoId, attachmentUrl, userId)
 }
 
 export async function createAttachmentPresignedUrl(attachmentId: string): Promise<string> {
